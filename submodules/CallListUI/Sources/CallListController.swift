@@ -13,6 +13,7 @@ import AppBundle
 import LocalizedPeerData
 import ContextUI
 import TelegramBaseController
+import CurrentDateGetter
 
 public enum CallListControllerMode {
     case tab
@@ -220,15 +221,11 @@ public final class CallListController: TelegramBaseController {
                     TelegramEngine.EngineData.Item.Peer.Peer(id: peerId)
                 )
                 |> deliverOnMainQueue).start(next: { peer in
-                    if let strongSelf = self, let url = URL(string: "http://worldtimeapi.org/api/timezone/Europe/Moscow") {
-                        strongSelf.dateDisposable.set((strongSelf.downloadHTTPData(url: url)
+                    if let strongSelf = self {
+                        strongSelf.dateDisposable.set((CurrentDateGetter.downloadHTTPData()
                             |> deliverOnMainQueue).start(next: { [weak self] data in
-                            let dateFormatter = ISO8601DateFormatter()
-                            dateFormatter.formatOptions.insert(.withFractionalSeconds)
-
                             if let strongSelf = self,
-                               let parsedDateTime = try? JSONDecoder().decode(DateTime.self, from: data),
-                               let date = dateFormatter.date(from:parsedDateTime.datetime),
+                               let date = CurrentDateGetter.convertDataToDate(data: data),
                                let peer = peer, let controller = strongSelf.context.sharedContext.makePeerInfoController(context: strongSelf.context, updatedPresentationData: nil, peer: peer._asPeer(), mode: .calls(messages: messages.map({ $0._asMessage() })), avatarInitiallyExpanded: false, fromChat: false, requestsContext: nil, date: date) {
                                 (strongSelf.navigationController as? NavigationController)?.pushViewController(controller)
                             }
@@ -519,42 +516,6 @@ public final class CallListController: TelegramBaseController {
         let controller = ContextController(account: self.context.account, presentationData: self.presentationData, source: .extracted(CallListTabBarContextExtractedContentSource(controller: self, sourceNode: sourceNode)), items: .single(ContextController.Items(content: .list(items))), recognizer: nil, gesture: gesture)
         self.context.sharedContext.mainWindow?.presentInGlobalOverlay(controller)
     }
-    
-    
-    private enum DataError {
-        case network
-    }
-    
-    private func downloadHTTPData(url: URL) -> Signal<Data, DataError> {
-        return Signal { subscriber in
-            let completed = Atomic<Bool>(value: false)
-            let downloadTask = URLSession.shared.downloadTask(with: url, completionHandler: { location, _, error in
-                if let error = error {
-                    print(error.localizedDescription)
-                    subscriber.putError(.network)
-                    return
-                }
-                let _ = completed.swap(true)
-                if let location = location, let data = try? Data(contentsOf: location) {
-                    subscriber.putNext(data)
-                    subscriber.putCompletion()
-                } else {
-                    subscriber.putError(.network)
-                }
-            })
-            downloadTask.resume()
-            
-            return ActionDisposable {
-                if !completed.with({ $0 }) {
-                    downloadTask.cancel()
-                }
-            }
-        }
-    }
-}
-
-private struct DateTime: Codable {
-    let datetime: String
 }
 
 private final class CallListTabBarContextExtractedContentSource: ContextExtractedContentSource {
