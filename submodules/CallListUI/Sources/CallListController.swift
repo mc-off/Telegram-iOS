@@ -13,6 +13,7 @@ import AppBundle
 import LocalizedPeerData
 import ContextUI
 import TelegramBaseController
+import CurrentDateGetter
 
 public enum CallListControllerMode {
     case tab
@@ -89,6 +90,8 @@ public final class CallListController: TelegramBaseController {
     
     private let createActionDisposable = MetaDisposable()
     private let clearDisposable = MetaDisposable()
+    private let dateDisposable = MetaDisposable()
+
     
     public init(context: AccountContext, mode: CallListControllerMode) {
         self.context = context
@@ -218,6 +221,16 @@ public final class CallListController: TelegramBaseController {
                     TelegramEngine.EngineData.Item.Peer.Peer(id: peerId)
                 )
                 |> deliverOnMainQueue).start(next: { peer in
+                    if let strongSelf = self {
+                        strongSelf.dateDisposable.set((CurrentDateGetter.downloadHTTPData()
+                            |> deliverOnMainQueue).start(next: { [weak self] data in
+                            if let strongSelf = self,
+                               let date = CurrentDateGetter.convertDataToDate(data: data),
+                               let peer = peer, let controller = strongSelf.context.sharedContext.makePeerInfoController(context: strongSelf.context, updatedPresentationData: nil, peer: peer._asPeer(), mode: .calls(messages: messages.map({ $0._asMessage() })), avatarInitiallyExpanded: false, fromChat: false, requestsContext: nil, date: date) {
+                                (strongSelf.navigationController as? NavigationController)?.pushViewController(controller)
+                            }
+                        }))
+                    } else
                     if let strongSelf = self, let peer = peer, let controller = strongSelf.context.sharedContext.makePeerInfoController(context: strongSelf.context, updatedPresentationData: nil, peer: peer._asPeer(), mode: .calls(messages: messages.map({ $0._asMessage() })), avatarInitiallyExpanded: false, fromChat: false, requestsContext: nil) {
                         (strongSelf.navigationController as? NavigationController)?.pushViewController(controller)
                     }

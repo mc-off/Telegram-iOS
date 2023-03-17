@@ -13,14 +13,16 @@ import TelegramStringFormatting
 public class ItemListCallListItem: ListViewItem, ItemListItem {
     let presentationData: ItemListPresentationData
     let dateTimeFormat: PresentationDateTimeFormat
+    let date: Date?
     let messages: [Message]
     public let sectionId: ItemListSectionId
     let style: ItemListStyle
     let displayDecorations: Bool
     
-    public init(presentationData: ItemListPresentationData, dateTimeFormat: PresentationDateTimeFormat, messages: [Message], sectionId: ItemListSectionId, style: ItemListStyle, displayDecorations: Bool = true) {
+    public init(presentationData: ItemListPresentationData, dateTimeFormat: PresentationDateTimeFormat, date: Date?, messages: [Message], sectionId: ItemListSectionId, style: ItemListStyle, displayDecorations: Bool = true) {
         self.presentationData = presentationData
         self.dateTimeFormat = dateTimeFormat
+        self.date = date
         self.messages = messages
         self.sectionId = sectionId
         self.style = style
@@ -234,8 +236,15 @@ public class ItemListCallListItemNode: ListViewItemNode {
             
             var accessibilityText = ""
             
-            let earliestMessage = item.messages.sorted(by: {$0.timestamp < $1.timestamp}).first!
-            let titleText = stringForDate(timestamp: earliestMessage.timestamp, strings: item.presentationData.strings)
+            //To check if date actually applied
+            var titleText: String
+            if let date = item.date {
+                titleText = stringForDate(date: date, strings: item.presentationData.strings)
+            }  else {
+                titleText = ""
+            }
+
+
             let (titleLayout, titleApply) = makeTitleLayout(TextNodeLayoutArguments(attributedString: NSAttributedString(string: titleText, font: titleFont, textColor: item.presentationData.theme.list.itemPrimaryTextColor), backgroundColor: nil, maximumNumberOfLines: 1, truncationType: .end, constrainedSize: CGSize(width: params.width - params.rightInset - 20.0 - leftInset, height: CGFloat.greatestFiniteMagnitude), alignment: .natural, cutout: nil, insets: UIEdgeInsets()))
             accessibilityText.append(titleText)
             accessibilityText.append(". ")
